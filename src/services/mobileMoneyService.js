@@ -288,11 +288,11 @@ class MobileMoneyService {
         paymentReference: payment._id,
         externalTransactionId: transactionId,
         from: {
-          account: callbackData.phoneNumber,
-          type: 'external'
+          phone: callbackData.phoneNumber || callbackData.customerPhone,
+          type: 'customer'
         },
         to: {
-          user: payment.merchant,
+          account: process.env.ZENO_ID || 'DEMO_MERCHANT',
           type: 'merchant'
         }
       });
@@ -308,35 +308,69 @@ class MobileMoneyService {
       };
 
     } catch (error) {
-      console.error(`Callback handling failed for ${network}:`, error.message);
+      console.error(`Mobile money callback handling failed for ${network}:`, error.message);
       throw error;
     }
   }
 
   /**
-   * Validate callback data based on network requirements
+   * Initiate mobile money payment to merchant account
+   * @param {Object} paymentData - Payment information
+   * @returns {Promise<Object>} Payment response
    */
-  validateCallbackData(network, data) {
-    const requiredFields = ['reference', 'status'];
+  async initiateMobileMoneyPayment(paymentData) {
+    try {
+      const payload = {
+        order_id: paymentData.orderId,
+        buyer_name: paymentData.buyerName,
+        buyer_phone: paymentData.buyerPhone,
+        buyer_email: paymentData.buyerEmail,
+        amount: paymentData.amount,
+        merchant_account_id: process.env.ZENO_ID || 'DEMO_MERCHANT', // Use ZENO_ID for receiving payments
+        webhook_url: paymentData.webhookUrl,
+        description: paymentData.description || 'Mobile money payment'
+      };
 
-    for (const field of requiredFields) {
-      if (!data[field]) {
-        throw new Error(`Missing required field: ${field}`);
+      // If using demo key, return mock response
+      if (this.apiKey === 'demo_api_key_placeholder') {
+        console.log('🎭 Demo mode: Simulating mobile money payment');
+        return {
+          success: true,
+          orderId: paymentData.orderId,
+          paymentStatus: 'PENDING',
+          reference: `MM_${Date.now()}`,
+          merchantAccountId: process.env.ZENO_ID || 'DEMO_MERCHANT',
+          metadata: paymentData.metadata
+        };
       }
-    }
 
-    // Network-specific validations
-    switch (network) {
-      case 'mtn':
-        if (!data.transactionId) {
-          throw new Error('MTN callback missing transactionId');
-        }
-        break;
-      case 'airtel':
-        if (!data.phoneNumber) {
-          throw new Error('Airtel callback missing phoneNumber');
-        }
-        break;
+      const response = await this.client.post('/payments/mobile_money_tanzania', payload);
+
+      return {
+        success: true,
+        orderId: response.data.order_id,
+        paymentStatus: response.data.payment_status,
+        reference: response.data.reference,
+        merchantAccountId: response.data.merchant_account_id,
+        metadata: response.data.metadata
+      };
+
+    } catch (error) {
+      console.error('Mobile money payment initiation failed:', error.response?.data || error.message);
+
+      // Return mock response in demo mode
+      if (this.apiKey === 'demo_api_key_placeholder') {
+        return {
+          success: true,
+          orderId: paymentData.orderId,
+          paymentStatus: 'PENDING',
+          reference: `MM_${Date.now()}`,
+          merchantAccountId: process.env.ZENO_ID || 'DEMO_MERCHANT',
+          metadata: paymentData.metadata
+        };
+      }
+
+      throw new Error(`Payment initiation failed: ${error.response?.data?.message || error.message}`);
     }
   }
 

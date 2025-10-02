@@ -19,7 +19,10 @@ router.post('/webhook', PaymentController.handleWebhook);
 router.get('/list', PaymentController.getPayments);
 router.get('/:orderId', PaymentController.getPayment);
 
-// Zenopay API information
-router.get('/info', PaymentController.getZenopayInfo);
+// Bank Transfer endpoints - Zenopay API Format
+router.post('/bank-transfer/initiate', PaymentController.initiateBankTransfer);
+router.get('/bank-transfer/status/:orderId', PaymentController.checkBankTransferStatus);
+router.post('/bank-transfer/validate-account', PaymentController.validateBankAccount);
+router.post('/bank-transfer/calculate-fees', PaymentController.calculateBankTransferFees);
 
 module.exports = router;

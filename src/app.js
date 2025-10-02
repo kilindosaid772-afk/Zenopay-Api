@@ -43,6 +43,7 @@ app.use(morgan('combined'));
 // Routes - Zenopay API structure
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/bank', require('./routes/bank'));
 
 // Health check
 app.get('/health', (req, res) => {

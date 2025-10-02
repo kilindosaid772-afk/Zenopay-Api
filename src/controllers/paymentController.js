@@ -53,7 +53,8 @@ class PaymentController {
           payer: {
             name: buyerName,
             email: buyerEmail,
-            phone: buyerPhone
+            phone: buyerPhone,
+            account: process.env.ZENO_ID || 'DEMO_MERCHANT' // Use ZENO_ID for receiving payments
           },
           merchant: req.user.id,
           status: result.paymentStatus === 'COMPLETED' ? 'completed' : 'pending',
@@ -282,6 +283,221 @@ class PaymentController {
         databaseConnected: false // Will be true when MongoDB is available
       }
     });
+  }
+
+  // Bank Transfer - Zenopay API Format
+  async initiateBankTransfer(req, res) {
+    try {
+      const {
+        amount,
+        currency,
+        toAccount,
+        toBank,
+        toAccountName,
+        description,
+        transferType,
+        webhookUrl,
+        metadata
+      } = req.body;
+
+      if (!amount || !toAccount || !toBank || !toAccountName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Amount, recipient account, bank, and account name are required'
+        });
+      }
+
+      // Generate unique order ID (UUID format as per Zenopay)
+      const orderId = uuidv4();
+
+      const transferData = {
+        orderId,
+        amount,
+        currency: currency || 'USD',
+        toAccount,
+        toBank,
+        toAccountName,
+        description,
+        transferType: transferType || 'immediate',
+        webhookUrl: webhookUrl || `${req.protocol}://${req.get('host')}/api/payments/webhook`,
+        metadata
+      };
+
+      // Call Zenopay bank transfer API
+      const result = await zenopayService.initiateBankTransfer(transferData);
+
+      // Try to save to database if available
+      try {
+        const Payment = require('../models/Payment');
+        const payment = new Payment({
+          orderId,
+          amount,
+          currency: currency || 'USD',
+          description: `Bank Transfer - ${toAccountName}`,
+          paymentMethod: {
+            type: 'bank_transfer',
+            provider: 'zenopay_bank'
+          },
+          payer: {
+            name: toAccountName,
+            account: process.env.ZENO_ID || 'DEMO_MERCHANT', // Use ZENO_ID for receiving payments
+            bank: 'Zenopay'
+          },
+          merchant: req.user.id,
+          status: result.transferStatus === 'COMPLETED' ? 'completed' : 'pending',
+          externalReference: result.reference,
+          externalTransactionId: result.externalTransactionId,
+          metadata: result.metadata
+        });
+
+        await payment.save();
+      } catch (dbError) {
+        console.log('Database not available, continuing without saving payment record');
+      }
+
+      res.json({
+        success: true,
+        message: 'Bank transfer initiated successfully',
+        data: {
+          orderId: result.orderId,
+          transferStatus: result.transferStatus,
+          reference: result.reference,
+          externalTransactionId: result.externalTransactionId,
+          amount: amount,
+          currency: currency || 'USD'
+        }
+      });
+
+    } catch (error) {
+      console.error('Bank transfer initiation failed:', error.message);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  // Check bank transfer status - Zenopay API Format
+  async checkBankTransferStatus(req, res) {
+    try {
+      const { orderId } = req.params;
+
+      if (!orderId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Order ID is required'
+        });
+      }
+
+      const result = await zenopayService.checkBankTransferStatus(orderId);
+
+      // Try to update database if available
+      try {
+        const Payment = require('../models/Payment');
+        const payment = await Payment.findOne({ orderId });
+
+        if (payment) {
+          const statusMap = {
+            'COMPLETED': 'completed',
+            'PENDING': 'pending',
+            'PROCESSING': 'processing',
+            'FAILED': 'failed',
+            'CANCELLED': 'cancelled'
+          };
+
+          const internalStatus = statusMap[result.transferStatus] || 'pending';
+          if (payment.status !== internalStatus) {
+            payment.updateStatus(internalStatus, `Status updated from Zenopay`);
+            await payment.save();
+          }
+        }
+      } catch (dbError) {
+        console.log('Database not available for status update');
+      }
+
+      res.json({
+        success: true,
+        data: {
+          orderId: result.orderId,
+          transferStatus: result.transferStatus,
+          reference: result.reference,
+          externalTransactionId: result.externalTransactionId,
+          metadata: result.metadata
+        }
+      });
+
+    } catch (error) {
+      console.error('Bank transfer status check failed:', error.message);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  // Validate bank account - Zenopay API Format
+  async validateBankAccount(req, res) {
+    try {
+      const { accountNumber, bankCode, accountType } = req.body;
+
+      if (!accountNumber || !bankCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Account number and bank code are required'
+        });
+      }
+
+      const result = await zenopayService.validateBankAccount({
+        accountNumber,
+        bankCode,
+        accountType
+      });
+
+      res.json({
+        success: true,
+        message: 'Bank account validation completed',
+        data: result
+      });
+
+    } catch (error) {
+      console.error('Bank account validation failed:', error.message);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  // Calculate bank transfer fees - Zenopay API Format
+  async calculateBankTransferFees(req, res) {
+    try {
+      const { amount, transferType } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid amount is required'
+        });
+      }
+
+      const result = await zenopayService.calculateBankTransferFees({
+        amount,
+        transferType: transferType || 'immediate'
+      });
+
+      res.json({
+        success: true,
+        message: 'Fee calculation completed',
+        data: result
+      });
+
+    } catch (error) {
+      console.error('Bank transfer fee calculation failed:', error.message);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
   }
 }
 
