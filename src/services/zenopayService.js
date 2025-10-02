@@ -246,18 +246,6 @@ class ZenopayService {
    */
   async checkBankTransferStatus(orderId) {
     try {
-      // If using demo key, return mock response
-      if (this.apiKey === 'demo_api_key_placeholder') {
-        console.log('🎭 Demo mode: Simulating bank transfer status check');
-        return {
-          success: true,
-          orderId: orderId,
-          transferStatus: 'PENDING',
-          reference: `BANK_REF_${Date.now()}`,
-          metadata: {}
-        };
-      }
-
       const response = await this.client.get('/payments/bank_transfer/status', {
         params: { order_id: orderId }
       });
@@ -273,20 +261,6 @@ class ZenopayService {
 
     } catch (error) {
       console.error('Bank transfer status check failed:', error.response?.data || error.message);
-
-      // Handle 404 and other errors gracefully
-      if (error.response?.status === 404 || !this.validateApiKey()) {
-        console.log('🎭 Demo mode: Simulating bank transfer status check');
-        return {
-          success: true,
-          orderId: orderId,
-          transferStatus: 'PENDING',
-          reference: `BANK_REF_${Date.now()}`,
-          metadata: {},
-          note: 'Demo mode - Status check endpoint not available'
-        };
-      }
-
       throw new Error(`Bank transfer status check failed: ${error.response?.data?.message || error.message}`);
     }
   }
@@ -304,19 +278,6 @@ class ZenopayService {
         account_type: accountData.accountType || 'savings'
       };
 
-      // If using demo key, return mock response
-      if (this.apiKey === 'demo_api_key_placeholder') {
-        console.log('🎭 Demo mode: Simulating bank account validation');
-        return {
-          success: true,
-          isValid: true,
-          accountName: 'Demo Account Holder',
-          bankName: 'Demo Bank',
-          accountType: 'savings',
-          message: 'Account is valid (demo mode)'
-        };
-      }
-
       const response = await this.client.post('/payments/bank_account/validate', payload);
 
       return {
@@ -330,21 +291,6 @@ class ZenopayService {
 
     } catch (error) {
       console.error('Bank account validation failed:', error.response?.data || error.message);
-
-      // Handle 404 and other errors gracefully
-      if (error.response?.status === 404 || !this.validateApiKey()) {
-        console.log('🎭 Demo mode: Simulating bank account validation');
-        return {
-          success: true,
-          isValid: true,
-          accountName: 'Demo Account Holder',
-          bankName: 'Demo Bank',
-          accountType: 'savings',
-          message: 'Account is valid (demo mode)',
-          note: 'Demo mode - Validation endpoint not available'
-        };
-      }
-
       throw new Error(`Bank account validation failed: ${error.response?.data?.message || error.message}`);
     }
   }
@@ -361,24 +307,6 @@ class ZenopayService {
         transfer_type: feeData.transferType || 'immediate'
       };
 
-      // If using demo key, return mock response
-      if (this.apiKey === 'demo_api_key_placeholder') {
-        console.log('🎭 Demo mode: Simulating fee calculation');
-        const fees = {
-          gatewayFee: feeData.amount * 0.015, // 1.5%
-          processingFee: feeData.amount * 0.005, // 0.5%
-          networkFee: 0.50
-        };
-
-        return {
-          success: true,
-          amount: feeData.amount,
-          transferType: feeData.transferType || 'immediate',
-          fees,
-          totalAmount: feeData.amount + fees.gatewayFee + fees.processingFee + fees.networkFee
-        };
-      }
-
       const response = await this.client.post('/payments/bank_transfer/fees', payload);
 
       return {
@@ -391,26 +319,6 @@ class ZenopayService {
 
     } catch (error) {
       console.error('Fee calculation failed:', error.response?.data || error.message);
-
-      // Handle 404 and other errors gracefully
-      if (error.response?.status === 404 || !this.validateApiKey()) {
-        console.log('🎭 Demo mode: Simulating fee calculation');
-        const fees = {
-          gatewayFee: feeData.amount * 0.015, // 1.5%
-          processingFee: feeData.amount * 0.005, // 0.5%
-          networkFee: 0.50
-        };
-
-        return {
-          success: true,
-          amount: feeData.amount,
-          transferType: feeData.transferType || 'immediate',
-          fees,
-          totalAmount: feeData.amount + fees.gatewayFee + fees.processingFee + fees.networkFee,
-          note: 'Demo mode - Fee calculation endpoint not available'
-        };
-      }
-
       throw new Error(`Fee calculation failed: ${error.response?.data?.message || error.message}`);
     }
   }
