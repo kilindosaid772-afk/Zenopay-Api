@@ -45,6 +45,9 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/bank', require('./routes/bank'));
 
+// Control numbers for mobile money payments
+app.use('/api/control-numbers', require('./routes/controlNumbers'));
+
 // Webhook routes (no authentication required for webhooks)
 app.use('/api/webhooks', require('./routes/webhooks'));
 
