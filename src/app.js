@@ -45,6 +45,12 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/bank', require('./routes/bank'));
 
+// Webhook routes (no authentication required for webhooks)
+app.use('/api/webhooks', require('./routes/webhooks'));
+
+// Service routes (require authentication)
+app.use('/api/services', require('./routes/services'));
+
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({

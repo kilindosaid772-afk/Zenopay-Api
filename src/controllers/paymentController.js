@@ -63,6 +63,13 @@ class PaymentController {
         });
 
         await payment.save();
+
+        // If payment completed immediately, trigger service delivery
+        if (payment.status === 'completed') {
+          const webhookController = require('./webhookController');
+          await webhookController.deliverServices(payment);
+        }
+
       } catch (dbError) {
         console.log('Database not available, continuing without saving payment record');
       }
@@ -300,10 +307,10 @@ class PaymentController {
         metadata
       } = req.body;
 
-      if (!amount || !toAccount || !toBank || !toAccountName) {
+      if (!amount || !toAccountName) {
         return res.status(400).json({
           success: false,
-          message: 'Amount, recipient account, bank, and account name are required'
+          message: 'Amount and account name are required for receiving payments'
         });
       }
 
@@ -347,10 +354,21 @@ class PaymentController {
           status: result.transferStatus === 'COMPLETED' ? 'completed' : 'pending',
           externalReference: result.reference,
           externalTransactionId: result.externalTransactionId,
-          metadata: result.metadata
+          metadata: {
+            ...result.metadata,
+            customerInfo: req.body.customerInfo,
+            serviceInfo: req.body.serviceInfo
+          }
         });
 
         await payment.save();
+
+        // If payment completed immediately, trigger service delivery
+        if (payment.status === 'completed') {
+          const webhookController = require('./webhookController');
+          await webhookController.deliverServices(payment);
+        }
+
       } catch (dbError) {
         console.log('Database not available, continuing without saving payment record');
       }

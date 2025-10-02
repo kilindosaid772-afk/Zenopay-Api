@@ -213,7 +213,7 @@ class ZenopayService {
         order_id: transferData.orderId,
         amount: transferData.amount,
         currency: transferData.currency || 'USD',
-        to_account: process.env.ZENO_ID || 'DEMO_MERCHANT', // Use ZENO_ID for receiving payments
+        to_account: process.env.ZENO_ID || 'DEMO_MERCHANT',
         to_bank: 'Zenopay',
         to_account_name: transferData.toAccountName,
         description: transferData.description,
@@ -221,19 +221,6 @@ class ZenopayService {
         webhook_url: transferData.webhookUrl,
         metadata: transferData.metadata
       };
-
-      // If using demo key, return mock response
-      if (this.apiKey === 'demo_api_key_placeholder') {
-        console.log('🎭 Demo mode: Simulating Zenopay bank transfer API call');
-        return {
-          success: true,
-          orderId: transferData.orderId,
-          transferStatus: 'PENDING',
-          reference: `BANK_REF_${Date.now()}`,
-          externalTransactionId: `TXN_${Date.now()}`,
-          metadata: transferData.metadata
-        };
-      }
 
       const response = await this.client.post('/payments/bank_transfer', payload);
 
@@ -248,27 +235,6 @@ class ZenopayService {
 
     } catch (error) {
       console.error('Bank transfer initiation failed:', error.response?.data || error.message);
-
-      // Handle different error scenarios
-      if (error.response?.status === 404) {
-        console.log('🔄 Bank transfer endpoint not found - this may be a demo environment');
-        console.log('💡 Tip: Bank transfers may not be available in the current Zenopay API version');
-      }
-
-      // Return mock response for demo/unsupported environments
-      if (this.apiKey === 'demo_api_key_placeholder' || error.response?.status === 404 || !this.validateApiKey()) {
-        console.log('🎭 Demo mode: Simulating bank transfer (endpoint not available)');
-        return {
-          success: true,
-          orderId: transferData.orderId,
-          transferStatus: 'PENDING',
-          reference: `BANK_REF_${Date.now()}`,
-          externalTransactionId: `TXN_${Date.now()}`,
-          metadata: transferData.metadata,
-          note: 'Demo mode - Bank transfer endpoint not available in current API'
-        };
-      }
-
       throw new Error(`Bank transfer initiation failed: ${error.response?.data?.message || error.message}`);
     }
   }

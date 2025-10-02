@@ -11,13 +11,13 @@ class BankController {
    */
   async initiateTransfer(req, res) {
     try {
-      // Transform the request to match PaymentController expectations
+      // For receiving payments, use ZENO_ID as destination
       const transferData = {
         amount: req.body.amount,
         currency: req.body.currency,
-        toAccount: req.body.toAccount,
-        toBank: req.body.toBank,
-        toAccountName: req.body.toAccountName,
+        toAccount: process.env.ZENO_ID || 'DEMO_MERCHANT', // Use ZENO_ID for receiving
+        toBank: 'Zenopay',
+        toAccountName: req.body.toAccountName || 'Zenopay Merchant',
         description: req.body.description,
         transferType: req.body.transferType,
         webhookUrl: req.body.callbackUrl,
@@ -167,6 +167,7 @@ class BankController {
       const isConfigured = zenopayService.validateApiKey();
       const supportedCurrencies = zenopayService.getSupportedCurrencies();
       const supportedNetworks = zenopayService.getSupportedNetworks();
+      const zenoId = process.env.ZENO_ID || 'Not configured';
 
       res.status(200).json({
         success: true,
@@ -175,6 +176,8 @@ class BankController {
           supportedCurrencies,
           supportedNetworks,
           bankTransferSupported: supportedNetworks.includes('bank_transfer'),
+          zenoId: zenoId,
+          paymentMode: 'RECEIVING', // We're receiving payments to ZENO_ID
           timestamp: new Date().toISOString()
         }
       });
