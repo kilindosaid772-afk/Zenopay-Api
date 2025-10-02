@@ -185,6 +185,8 @@ class MobileMoneyService {
       console.error(`Control number payment failed for ${network}:`, error.message);
       throw error;
     }
+  }
+
   /**
    * Validate API key format
    */

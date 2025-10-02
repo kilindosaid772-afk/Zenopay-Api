@@ -157,11 +157,11 @@ controlNumberSchema.pre('save', function(next) {
   next();
 });
 
-// Generate unique control number
-controlNumberSchema.methods.generateControlNumber = function() {
+// Static method to generate unique control number
+controlNumberSchema.statics.generateControlNumber = function() {
   const timestamp = Date.now().toString().slice(-8);
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${this.prefix}${timestamp}${random}`;
+  return `ZENO${timestamp}${random}`;
 };
 
 // Mark as used

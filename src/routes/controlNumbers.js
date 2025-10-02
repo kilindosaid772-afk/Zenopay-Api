@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const controlNumberController = require('../controllers/controlNumberController');
-const { authenticate } = require('../middleware/auth');
+const { authenticateApiKey } = require('../middleware/auth');
 
-// All control number routes require authentication
-router.use(authenticate);
+// All control number routes require Zenopay API key authentication (like payment routes)
+router.use(authenticateApiKey);
 
 // Generate control number
 router.post('/generate', controlNumberController.generateControlNumber);
