@@ -6,6 +6,18 @@ const Payment = require('../models/Payment');
  */
 class ControlNumberController {
 
+  constructor() {
+    // Bind all methods to ensure proper 'this' context
+    this.generateControlNumber = this.generateControlNumber.bind(this);
+    this.validateControlNumber = this.validateControlNumber.bind(this);
+    this.getMerchantControlNumbers = this.getMerchantControlNumbers.bind(this);
+    this.useControlNumber = this.useControlNumber.bind(this);
+    this.generateBatch = this.generateBatch.bind(this);
+    this.getStatistics = this.getStatistics.bind(this);
+    this.cleanupExpired = this.cleanupExpired.bind(this);
+    this.getPaymentInstructions = this.getPaymentInstructions.bind(this);
+  }
+
   /**
    * Generate a new control number
    */
@@ -46,7 +58,7 @@ class ControlNumberController {
             message: 'Unable to generate unique control number'
           });
         }
-      } while (await ControlNumber.findOne({ controlNumber }));
+      } while (await ControlNumber.findOneWithTimeout({ controlNumber }));
 
       // Calculate expiration dates
       const now = new Date();
@@ -63,8 +75,8 @@ class ControlNumberController {
           type: paymentMethod,
           provider
         },
-        merchant: req.user.id,
-        generatedBy: req.user.id,
+        merchant: req.user.id || req.user.type === 'api_key' ? 'zenopay_api_user' : req.user.id,
+        generatedBy: req.user.id || req.user.type === 'api_key' ? 'zenopay_api_user' : req.user.id,
         expiresAt,
         validUntil,
         isReusable,
@@ -134,7 +146,7 @@ class ControlNumberController {
           description: controlNum.description,
           expiresAt: controlNum.expiresAt,
           paymentMethod: controlNum.paymentMethod,
-          merchantName: controlNum.merchant?.name || 'Merchant',
+          merchantName: controlNum.merchant?.name || (typeof controlNum.merchant === 'string' ? 'Merchant' : 'Merchant'),
           instructions: this.getPaymentInstructions(controlNum, network)
         }
       });
@@ -156,8 +168,8 @@ class ControlNumberController {
       const { status = 'active', limit = 50, page = 1 } = req.query;
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      const controlNumbers = await ControlNumber.find({
-        merchant: req.user.id,
+      const controlNumbers = await ControlNumber.findWithTimeout({
+        merchant: req.user.id || req.user.type === 'api_key' ? 'zenopay_api_user' : req.user.id,
         status: status
       })
       .populate('paymentReference', 'amount currency status createdAt')
@@ -166,7 +178,7 @@ class ControlNumberController {
       .skip(skip);
 
       const total = await ControlNumber.countDocuments({
-        merchant: req.user.id,
+        merchant: req.user.id || req.user.type === 'api_key' ? 'zenopay_api_user' : req.user.id,
         status: status
       });
 
@@ -213,7 +225,7 @@ class ControlNumberController {
       const { controlNumber } = req.params;
       const { paymentReference, customerInfo, network } = req.body;
 
-      const controlNum = await ControlNumber.findOne({
+      const controlNum = await ControlNumber.findOneWithTimeout({
         controlNumber,
         status: 'active'
       });
@@ -286,8 +298,8 @@ class ControlNumberController {
         amount,
         currency,
         paymentMethod,
-        merchant: req.user.id,
-        generatedBy: req.user.id,
+        merchant: req.user.id || req.user.type === 'api_key' ? 'zenopay_api_user' : req.user.id,
+        generatedBy: req.user.id || req.user.type === 'api_key' ? 'zenopay_api_user' : req.user.id,
         expiresInDays,
         validForDays,
         isReusable,
@@ -323,10 +335,10 @@ class ControlNumberController {
    */
   async getStatistics(req, res) {
     try {
-      const merchantId = req.user.id;
+      const merchantId = req.user.id || req.user.type === 'api_key' ? 'zenopay_api_user' : req.user.id;
 
       const stats = await ControlNumber.aggregate([
-        { $match: { merchant: mongoose.Types.ObjectId(merchantId) } },
+        { $match: { merchant: merchantId } },
         {
           $group: {
             _id: null,
@@ -391,7 +403,7 @@ class ControlNumberController {
     };
 
     // Network-specific instructions
-    if (network === 'mtn' || controlNum.paymentMethod.provider === 'mtn') {
+    if (network === 'mtn' || controlNum.paymentMethod?.provider === 'mtn') {
       instructions.mpesa = {
         app: 'M-Pesa',
         steps: [
@@ -405,7 +417,7 @@ class ControlNumberController {
       };
     }
 
-    if (network === 'airtel' || controlNum.paymentMethod.provider === 'airtel') {
+    if (network === 'airtel' || controlNum.paymentMethod?.provider === 'airtel') {
       instructions.airtel = {
         app: 'Airtel Money',
         steps: [
@@ -427,7 +439,7 @@ class ControlNumberController {
    */
   async cleanupExpired(req, res) {
     try {
-      const expiredControlNumbers = await ControlNumber.findExpired();
+      const expiredControlNumbers = await ControlNumber.findExpiredWithTimeout();
 
       for (const controlNum of expiredControlNumbers) {
         controlNum.status = 'expired';
